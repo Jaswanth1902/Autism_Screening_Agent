@@ -1,0 +1,43 @@
+# ⚙️ Operating System / IDE Files
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+
+# 🐍 Python Specific Files
+# Virtual Environment
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Compiled packages and platform-specific binaries
+*.so
+*.pyd
+*.dll
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# 🧩 Machine Learning / Data Science
+# Common data/model files (Use Git LFS if you MUST track them)
+*.csv
+*.zip
+*.pt  # PyTorch models
+*.h5  # Keras/TensorFlow models
+*.joblib
+*.pkl # Python pickles (often used for models)
+
+# Jupyter Notebook/VS Code interactive files
+.ipynb_checkpoints
+
+# Logs and test results
+*.log
+nosetests.xml
+coverage.xml
+
+# Temporary files created by packages like CatBoost/XGBoost
+# CatBoost can create large temporary folders/files
+catboost_info/

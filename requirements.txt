@@ -1,0 +1,15 @@
+numpy>=1.23
+pandas>=1.4
+scipy>=1.7
+liac-arff>=2.5.0
+scikit-learn>=1.1
+xgboost>=1.7
+lightgbm>=3.3
+catboost>=1.1
+optuna>=3.0
+imblearn>=0.10.1
+joblib>=1.2
+shap>=0.42
+matplotlib>=3.5
+seaborn>=0.12
+flask>=2.1               # for later web integration
