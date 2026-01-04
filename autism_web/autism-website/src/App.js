@@ -1,15 +1,23 @@
 import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
+import Screening from "./pages/Screening";   // <-- Add this page
 
 function App() {
   return (
-    <>
+    <BrowserRouter>
       <Navbar />
-      <Home />
+
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/screening" element={<Screening />} />
+      </Routes>
+
       <Footer />
-    </>
+    </BrowserRouter>
   );
 }
 

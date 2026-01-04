@@ -1,6 +1,5 @@
 """
-Load dataset (ARFF, CSV, TXT, or extension-less), clean, encode, impute, and save as CSV.
-Outputs: data/processed/autism_cleaned.csv
+Clean and save three ARFF autism datasets: child, adolescent, adult
 """
 
 import os
@@ -8,116 +7,94 @@ import pandas as pd
 import numpy as np
 from scipy.io import arff
 
-# --- Paths ---
-RAW_PATH = os.path.join('../data/raw/autism_combined_all')   # no extension
-OUT_PATH = os.path.join('../data/processed/autism_cleaned.csv')
+# --- INPUT DATA PATHS (change filenames if different) ---
+INPUT_FILES = {
+    "child": "../data/raw/Autism-Child-Data.arff",
+    "adolescent": "../data/raw/Autism-Adolescent-Data.arff",
+    "adult": "../data/raw/Autism-Adult-Data.arff"
+}
+
+# --- OUTPUT FOLDER ---
+OUT_DIR = "../data/processed/"
 
 
-# ---------- 1. LOADING FUNCTION ----------
-def load_data(path=RAW_PATH):
-    """Loads dataset automatically (supports .arff, .csv, .txt, or no extension)."""
+# ---------- LOAD ARFF ----------
+def load_arff(path):
     if not os.path.exists(path):
-        raise FileNotFoundError(f"❌ Dataset not found at: {path}")
-
-    # Try ARFF first (some ARFF files have no .arff extension)
-    try:
-        raw, meta = arff.loadarff(path)
-        df = pd.DataFrame(raw)
-        for col in df.select_dtypes([object]).columns:
-            try:
-                df[col] = df[col].str.decode('utf-8')
-            except Exception:
-                pass
-        print(f"✅ Loaded ARFF-like file with shape {df.shape}")
-        return df
-    except Exception:
-        pass  # not ARFF, try as text/CSV
-
-    # Try detecting delimiter automatically
-    with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-        sample = f.readline()
-
-    if sample.count(',') >= sample.count('\t'):
-        sep = ','
-    else:
-        sep = '\t'
-
-    try:
-        df = pd.read_csv(path, sep=sep)
-        print(f"✅ Loaded delimited text file (sep='{sep}') with shape {df.shape}")
-        return df
-    except Exception as e:
-        raise ValueError(f"❌ Could not load file at {path}. Error: {e}")
+        raise FileNotFoundError(f"❌ File not found: {path}")
+    
+    data, meta = arff.loadarff(path)
+    df = pd.DataFrame(data)
+    
+    # decode byte strings
+    for col in df.select_dtypes(include=[object]):
+        df[col] = df[col].apply(lambda x: x.decode('utf-8') if isinstance(x, bytes) else x)
+    
+    print(f"📥 Loaded ARFF: {os.path.basename(path)} | Shape: {df.shape}")
+    return df
 
 
-# ---------- 2. CLEANING FUNCTION ----------
+# ---------- CLEAN ----------
 def clean(df):
-    """Clean and standardize autism dataset."""
     df.columns = [c.strip() for c in df.columns]
-    df.replace({'?': np.nan, '': np.nan, 'NA': np.nan, 'na': np.nan}, inplace=True)
-    df = df.drop_duplicates()
+    df.replace({'?': np.nan, '': np.nan}, inplace=True)
+    df.drop_duplicates(inplace=True)
 
-    # Rename inconsistent column
+    # Normalize target
     if 'Class/ASD' in df.columns:
         df.rename(columns={'Class/ASD': 'Class_ASD'}, inplace=True)
 
-    # Binary yes/no columns
-    binary_map = {'yes': 1, 'no': 0, 'YES': 1, 'NO': 0, 'Yes': 1, 'No': 0}
-    for col in ['jundice', 'austim', 'used_app_before']:
-        if col in df.columns:
-            df[col] = df[col].map(binary_map).astype('Int64')
-
-    # Target variable
-    if 'Class_ASD' in df.columns:
-        df['Class_ASD'] = df['Class_ASD'].map(binary_map).astype('Int64')
-
-    # Normalize gender values
-    if 'gender' in df.columns:
-        df['gender'] = df['gender'].replace({'m': 'M', 'f': 'F', 'male': 'M', 'female': 'F', 'self': 'self'})
-
-    # Convert numeric-looking text to numbers
+    # Map Yes/No to 1/0
+    binary_map = {'yes': 1, 'y': 1, 'no': 0, 'n': 0}
     for col in df.columns:
-        if df[col].dtype == object:
-            try:
-                df[col] = pd.to_numeric(df[col])
-            except Exception:
-                pass
+        if df[col].dtype == 'object' and df[col].isin(binary_map.keys()).any():
+            df[col] = df[col].map(binary_map)
 
-    print(f"🧹 Cleaned data. Shape after cleaning: {df.shape}")
+    # Normalize gender
+    if 'gender' in df.columns:
+        df['gender'] = df['gender'].replace(
+            {'m': 'M', 'f': 'F', 'male': 'M', 'female': 'F'}
+        )
+
+    print("🧹 Cleaning complete.")
     return df
 
 
-# ---------- 3. IMPUTATION FUNCTION ----------
-def basic_impute(df):
-    """Fill missing values with median/mode."""
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cat_cols = df.select_dtypes(exclude=[np.number]).columns.tolist()
+# ---------- IMPUTE ----------
+def impute(df):
+    numeric = df.select_dtypes(include=[np.number]).columns
+    categorical = df.select_dtypes(exclude=[np.number]).columns
 
-    for c in numeric_cols:
+    for c in numeric:
         df[c] = df[c].fillna(df[c].median())
 
-    for c in cat_cols:
-        mode_val = df[c].mode().iloc[0] if not df[c].mode().empty else "Unknown"
-        df[c] = df[c].fillna(mode_val)
+    for c in categorical:
+        mode = df[c].mode()
+        df[c] = df[c].fillna(mode.iloc[0] if not mode.empty else "Unknown")
 
-    print(f"🧩 Imputed missing values. Remaining NaNs: {df.isna().sum().sum()}")
+    print("🧩 Missing values filled.")
     return df
 
 
-# ---------- 4. SAVE FUNCTION ----------
-def save(df, out=OUT_PATH):
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    df.to_csv(out, index=False)
-    print(f"💾 Saved cleaned data to: {out}")
+# ---------- SAVE ----------
+def save(df, name):
+    os.makedirs(OUT_DIR, exist_ok=True)
+    out_path = os.path.join(OUT_DIR, f"{name}_clean.csv")
+    df.to_csv(out_path, index=False)
+    print(f"💾 Saved {name.upper()} → {out_path}\n")
 
 
-# ---------- 5. MAIN RUN ----------
+# ---------- MAIN ----------
 def run():
-    df = load_data()
-    df = clean(df)
-    df = basic_impute(df)
-    save(df)
+    print("🚀 Preprocessing beginning...\n")
+    for name, path in INPUT_FILES.items():
+        print(f"🔹 Processing {name.upper()} dataset")
+        df = load_arff(path)
+        df = clean(df)
+        df = impute(df)
+        save(df, name)
+    print("🎯 All datasets processed successfully!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()

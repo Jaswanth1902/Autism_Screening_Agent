@@ -2,15 +2,15 @@ import pandas as pd
 import joblib
 
 # ✅ Update paths
-PIPELINE_PATH = r"./autism_ml/artifacts/feature_selector.pkl"
-MODEL_PATH = r"./artifacts/model_best_pro_20251029_1633.pkl"
+# Using child model as an example, since there are two versions, I'll use the latest one
+MODEL_PATH = r"autism_ml/artifacts/child_model_20251204_1503.pkl" # This file contains model and preprocessor
 
-print(f"📂 Using pipeline: {PIPELINE_PATH}")
 print(f"📂 Using model: {MODEL_PATH}\n")
 
-# 🔹 Load pipeline and model
-pipeline = joblib.load(PIPELINE_PATH)
-model = joblib.load(MODEL_PATH)
+# 🔹 Load model data
+model_data = joblib.load(MODEL_PATH)
+pipeline = model_data["preprocessor"]
+model = model_data["model"]
 
 # ✅ Complex but valid baby dataset samples (0=No, 1=Yes)
 sample_data = pd.DataFrame([
@@ -37,8 +37,27 @@ sample_data = pd.DataFrame([
         "jundice": 0, "austim": 0, "contry_of_res": "India",
         "used_app_before": 1, "result": 7, "age_desc": "4 and below",
         "relation": "Parent"
+    },
+    {   # "Not Sure" test (some 0.5 values)
+        "A1_Score": 0.5, "A2_Score": 0.5, "A3_Score": 1, "A4_Score": 0.5, "A5_Score": 1,
+        "A6_Score": 0.5, "A7_Score": 0.5, "A8_Score": 1, "A9_Score": 0.5, "A10_Score": 1,
+        "age": 4, "gender": "m", "ethnicity": "Others",
+        "jundice": 0, "austim": 0, "contry_of_res": "United States",
+        "used_app_before": 0, "result": 5, "age_desc": "4 and below",
+        "relation": "Parent"
     }
 ])
+
+# 🔹 Add engineered features expected by the model
+score_cols = [f"A{i}_Score" for i in range(1, 11)]
+sample_data["score_sum"] = sample_data[score_cols].sum(axis=1)
+sample_data["score_mean"] = sample_data[score_cols].mean(axis=1)
+sample_data["family_risk"] = sample_data["austim"].astype(float) + sample_data["jundice"].astype(float)
+
+# Drop meta columns if they were dropped during training (as seen in models.py)
+for drop_col in ("result", "age_desc"):
+    if drop_col in sample_data.columns:
+        sample_data = sample_data.drop(columns=[drop_col])
 
 
 print("🧠 Running preprocessing pipeline...")
