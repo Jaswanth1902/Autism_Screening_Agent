@@ -88,12 +88,12 @@ def calculate_isaa_risk(data):
     For standard ISAA, scores are 1-5, but we normalize here.
     """
     total_score = 0
-    # Map our 0/0.5/1 to ISAA 1-5 scale roughly:
-    # 0 (Rarely) -> 1
-    # 0.5 (Sometimes) -> 3
-    # 1 (Always) -> 5
-    
-    score_map = {0: 1, 0.5: 3, 1: 5, "0": 1, "0.5": 3, "1": 5}
+    # Map our 0-1 values to ISAA 1-5 scale:
+    # 0 -> 1, 0.25 -> 2, 0.5 -> 3, 0.75 -> 4, 1 -> 5
+    score_map = {
+        0: 1, 0.25: 2, 0.5: 3, 0.75: 4, 1: 5,
+        "0": 1, "0.25": 2, "0.5": 3, "0.75": 4, "1": 5
+    }
     
     question_count = 0
     for i in range(1, 41):
@@ -198,18 +198,82 @@ def evaluate_isaa():
             return jsonify({"error": "No data provided"}), 400
 
         result = calculate_isaa_risk(data)
+
+        # --- Hybrid Inference Integration ---
+        # Map 40 ISAA questions to 10 AQ-10 inputs for ML model
+        # Logic: Average relevant ISAA values (0.0 to 1.0)
+        def get_avg(qs):
+            vals = [float(data.get(q, 0)) for q in qs]
+            return sum(vals) / len(vals) if vals else 0
+
+        aq10_inputs = {
+            "A1_Score": get_avg(["Q1", "Q2"]),
+            "A2_Score": get_avg(["Q3"]),
+            "A3_Score": get_avg(["Q4"]),
+            "A4_Score": get_avg(["Q5"]),
+            "A5_Score": get_avg(["Q6"]),
+            "A6_Score": get_avg(["Q7", "Q16"]),
+            "A7_Score": get_avg(["Q15", "Q17", "Q18"]),
+            "A8_Score": get_avg(["Q8", "Q24"]),
+            "A9_Score": get_avg(["Q9", "Q30"]),
+            "A10_Score": get_avg(["Q10", "Q25"]),
+            "age": data.get("age", 5),
+            "gender": data.get("gender", "m"),
+            "jaundice": data.get("jaundice", "0"),
+            "autism_in_family": data.get("autism_in_family", "0")
+        }
+
+        # Run ML inference
+        ml_prob = 0
+        if model_data:
+            try:
+                # Reuse the internal predict logic but with mapped inputs
+                # We need to call predict() logic or factor it out. 
+                # For now, let's keep it simple: 
+                # Since we don't want to duplicate the entire predict logic, 
+                # we'll mock a request-like object or just call the model directly
+                df_ml = pd.DataFrame([{
+                    "A1_Score": aq10_inputs["A1_Score"],
+                    "A2_Score": aq10_inputs["A2_Score"],
+                    "A3_Score": aq10_inputs["A3_Score"],
+                    "A4_Score": aq10_inputs["A4_Score"],
+                    "A5_Score": aq10_inputs["A5_Score"],
+                    "A6_Score": aq10_inputs["A6_Score"],
+                    "A7_Score": aq10_inputs["A7_Score"],
+                    "A8_Score": aq10_inputs["A8_Score"],
+                    "A9_Score": aq10_inputs["A9_Score"],
+                    "A10_Score": aq10_inputs["A10_Score"],
+                    "age": aq10_inputs["age"],
+                    "gender": str(aq10_inputs["gender"]).lower()[0] if aq10_inputs["gender"] else "m",
+                    "jundice": str(aq10_inputs["jaundice"]),
+                    "austim": str(aq10_inputs["autism_in_family"]),
+                    "ethnicity": "Others",
+                    "contry_of_res": "Jordan",
+                    "used_app_before": "0",
+                    "relation": "Parent"
+                }])
+                
+                df_ml = add_engineered_features(df_ml)
+                X_trans = model_data["preprocessor"].transform(df_ml)
+                probs = model_data["model"].predict_proba(X_trans)
+                ml_prob = float(probs[0][1])
+            except Exception as ml_e:
+                print(f"⚠️ ML Hybrid Inference warning: {ml_e}")
+
+        # Combine Logical Risk and ML Probability for a Confidence Index
+        # Normalized clinical score (0-1)
+        clinical_prob = (result["score"] - 40) / 160
         
-        # Normalize score to a 0-1 probability-like value for frontend compatibility
-        # Max score is 200 (40 * 5), Min is 40 (40 * 1)
-        # We'll use (score - 40) / 160
-        prob = (result["score"] - 40) / 160
-        
+        # Weighted average: 60% Clinical (ISAA is the gold standard here), 40% ML
+        final_prob = (clinical_prob * 0.6) + (ml_prob * 0.4) if ml_prob > 0 else clinical_prob
+
         return jsonify({
-            "prediction": 1 if result["is_autistic"] else 0,
-            "probability": round(prob, 4),
+            "prediction": 1 if final_prob >= 0.5 else 0,
+            "probability": round(final_prob, 4),
             "risk_level": result["risk_level"],
             "is_autistic": result["is_autistic"],
-            "total_score": result["score"]
+            "total_score": result["score"],
+            "ml_confidence": round(ml_prob, 4) if ml_prob > 0 else None
         })
     except Exception as e:
         print(f"❌ ISAA Evaluation error: {e}")

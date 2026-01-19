@@ -457,3 +457,34 @@ body {
   gap: 10px;
   line-height: 1.5;
 }
+
+.isaa-info-link-container {
+  margin-top: 20px;
+  text-align: center;
+  padding: 14px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.isaa-info-link-container:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.isaa-info-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.isaa-info-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}

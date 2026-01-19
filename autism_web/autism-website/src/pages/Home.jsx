@@ -100,6 +100,7 @@ const Home = () => {
         <div>
           <h2>Research & Performance</h2>
           <ul className="details-list">
+            <li>Questioning Standard: ISAA</li>
             <li>Accuracy: 94.2%</li>
             <li>AUC Score: 0.96</li>
             <li>Stable performance across age groups</li>
