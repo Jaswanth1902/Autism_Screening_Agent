@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ChatWidget from "./components/ChatWidget";
 import Home from "./pages/Home";
 import Screening from "./pages/Screening";   // <-- Add this page
 
@@ -17,6 +18,7 @@ function App() {
       </Routes>
 
       <Footer />
+      <ChatWidget />
     </BrowserRouter>
   );
 }

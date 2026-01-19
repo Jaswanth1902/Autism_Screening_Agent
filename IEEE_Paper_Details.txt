@@ -1,0 +1,81 @@
+IEEE CONFERENCE PAPER DETAILS: AUTISM SCREENING AGENT
+
+--------------------------------------------------------------------------------
+1. TITLE
+--------------------------------------------------------------------------------
+"Autism Screening Agent: An Intelligent Stacking Ensemble Framework with Explainable AI for Early ASD Detection in Children"
+
+--------------------------------------------------------------------------------
+2. ABSTRACT
+--------------------------------------------------------------------------------
+Early detection of Autism Spectrum Disorder (ASD) is critical for improving long-term developmental outcomes in children. Traditional screening methods often rely on subjective behavioral observations which can be delayed or inaccessible. This paper presents the 'Autism Screening Agent', a comprehensive AI-powered platform that integrates a sophisticated machine learning backend with an interactive web frontend. The system utilizes a Stacking Ensemble of Random Forest, XGBoost, LightGBM, and CatBoost models, optimized via Optuna hyperparameter tuning, to predict ASD traits with high precision. Furthermore, the framework incorporates Explainable AI (XAI) using SHAP (SHapley Additive exPlanations) and Permutation Importance to provide transparency in clinical decision-making. Supporting both the 10-question behavioral screening and the 40-item Indian Scale for Assessment of Autism (ISAA), the platform offers a 3-tier risk assessment, local resource mapping, and an AI-driven empathetic chatbot (Gemini AI) to guide caregivers through the screening process.
+
+--------------------------------------------------------------------------------
+3. KEYWORDS
+--------------------------------------------------------------------------------
+Autism Spectrum Disorder (ASD), Machine Learning, Stacking Ensemble, Explainable AI (XAI), SHAP, ISAA, Early Intervention, Flask, React.js.
+
+--------------------------------------------------------------------------------
+4. INTRODUCTION
+--------------------------------------------------------------------------------
+- Problem: Increasing prevalence of ASD and the scarcity of specialized diagnostic centers in many regions.
+- Motivation: Bridging the gap between initial concern and professional evaluation through a localized, accessible, and high-accuracy screening tool.
+- Objective: To develop a robust, explainable, and empathetic screening agent that utilizes multi-model intelligence to provide actionable insights for parents and clinicians.
+
+--------------------------------------------------------------------------------
+5. LITERATURE SURVEY / DATASET
+--------------------------------------------------------------------------------
+- Dataset Source: UCI Machine Learning Repository (Autism Child, Adolescent, and Adult datasets).
+- Clinical Scales: Implementation based on Q-CHAT-10 and the Indian Scale for Assessment of Autism (ISAA).
+- Inspiration: Existing works in ASD detection using SVM and CNN, evolved here into a boosting-heavy ensemble for tabular data.
+
+--------------------------------------------------------------------------------
+6. PROPOSED METHODOLOGY
+--------------------------------------------------------------------------------
+A. Preprocessing & Feature Engineering
+   - Imputation: Median for numeric, most frequent for categorical.
+   - Engineering: 
+     - 'score_sum' and 'score_mean' from behavioral questions.
+     - 'family_risk' derived from jaundice and family autism history.
+   - Scaling: StandardScaler for numerical features.
+   - Selection: RFECV (Recursive Feature Elimination with Cross-Validation).
+
+B. Model Architecture (Stacking Ensemble)
+   - Base Learners: 
+     1. Random Forest (Balanced class weights)
+     2. XGBoost (Optuna-tuned)
+     3. LightGBM (Gradient Boosting)
+     4. CatBoost (Categorical Boosting)
+   - Meta-Learner: Logistic Regression (aggregating probabilities).
+   - Calibration: Isotonic Regression for precise probability output.
+
+C. Explainability Layer
+   - SHAP: Global and Local feature importance visualization.
+   - Permutation Importance: Robust validation of feature impact.
+
+--------------------------------------------------------------------------------
+7. SYSTEM IMPLEMENTATION
+--------------------------------------------------------------------------------
+- Backend: Python, Flask, Scikit-learn, XGBoost, LightGBM, CatBoost, Optuna, Joblib.
+- Frontend: React.js, Recharts (Radar charts for domain analysis), jsPDF (Clinical report generation).
+- Intelligent Assistant: Integration with Google Gemini AI (gemini-2.5-flash) for context-aware, empathetic caregiver support.
+
+--------------------------------------------------------------------------------
+8. EVALUATION METRICS
+--------------------------------------------------------------------------------
+- Primary Metric: F1-Score (to balance Precision and Recall).
+- Accuracy Metrics: ROC-AUC, PR-AUC.
+- Reliability Metrics: Brier Score (Calibration error), MCC (Matthews Correlation Coefficient).
+
+--------------------------------------------------------------------------------
+9. RESULTS & DISCUSSION
+--------------------------------------------------------------------------------
+- Domain-wise analysis using Radar charts across 6 ISAA domains (Social, Emotional, Speech-Language, Behavior, Sensory, Cognitive).
+- 3-Tier Risk Output: Green (Low), Yellow (Moderate), Orange (High).
+- Automated Clinical Report: PDF generation for clinician review.
+
+--------------------------------------------------------------------------------
+10. CONCLUSION & FUTURE WORK
+--------------------------------------------------------------------------------
+- Conclusion: The Stacking Ensemble approach combined with XAI provides a reliable and transparent screening foundation.
+- Future Work: Integration of computer vision for facial expression analysis and mobile app deployment for wider accessibility.

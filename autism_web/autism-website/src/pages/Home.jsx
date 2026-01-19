@@ -21,7 +21,7 @@ const Home = () => {
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-content">
-          <h1 className="hero-title">Early Autism Detection Using AI 🤖</h1>
+          <h1 className="hero-title">Early Autism Detection Using AI</h1>
           <p className="hero-desc">
             Smart screening for early behavioral indicators to support families and doctors.
           </p>
