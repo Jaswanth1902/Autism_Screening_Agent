@@ -1,10 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./ChatWidget.css";
 
+const SUGGESTED_QUESTIONS = [
+  "What does a high Sensory score mean?",
+  "How can I help my child with Social Relationship?",
+  "What are the next steps after this screening?",
+  "Explain the ISAA behavior domain."
+];
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { text: "Hello! I'm here to help answer questions. Ask me anything u don't understand.", sender: "bot" }
+    { text: "Hello! I am your Clinical Support Assistant. I can explain your child's scores or answer questions about ASD. How can I help you today?", sender: "bot" }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,12 +23,13 @@ export default function ChatWidget() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, loading]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (overrideText = null) => {
+    const textToSend = overrideText || input;
+    if (!textToSend.trim()) return;
 
-    const userMessage = { text: input, sender: "user" };
+    const userMessage = { text: textToSend, sender: "user" };
     setMessages(prev => [...prev, userMessage]);
     setInput("");
     setLoading(true);
@@ -30,7 +38,7 @@ export default function ChatWidget() {
       const response = await fetch("http://127.0.0.1:5000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input })
+        body: JSON.stringify({ message: textToSend })
       });
 
       const data = await response.json();
@@ -64,10 +72,13 @@ export default function ChatWidget() {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="chat-window">
+        <div className="chat-window fade-in">
           <div className="chat-header">
-            <h3>Autism Screening Assistant</h3>
-            <p>Ask me anything u don't understand</p>
+            <div className="header-icon">🏥</div>
+            <div className="header-text">
+              <h3>Clinical Support</h3>
+              <p>Specialized ASD Assistant</p>
+            </div>
           </div>
 
           <div className="chat-messages">
@@ -83,6 +94,16 @@ export default function ChatWidget() {
                 </div>
               </div>
             )}
+            {!loading && messages.length < 3 && (
+              <div className="suggestions-container">
+                <p className="suggestion-label">Suggested Questions:</p>
+                {SUGGESTED_QUESTIONS.map((q, i) => (
+                  <button key={i} className="suggestion-chip" onClick={() => sendMessage(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -92,9 +113,9 @@ export default function ChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Type your question..."
+              placeholder="Ask about domains, scores, or next steps..."
             />
-            <button onClick={sendMessage} disabled={loading || !input.trim()}>
+            <button className="send-btn" onClick={() => sendMessage()} disabled={loading || !input.trim()}>
               Send
             </button>
           </div>

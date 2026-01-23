@@ -65,9 +65,9 @@ N_FOLDS = 5
 TARGET = "Class_ASD"
 
 DATASETS = {
-    "child": "../data/processed/child_clean.csv",
-    "adolescent": "../data/processed/adolescent_clean.csv",
-    "adult": "../data/processed/adult_clean.csv",
+    "child": "../data/processed/child_kaggle.csv",
+    "adolescent": "../data/processed/adolescent_kaggle.csv",
+    "adult": "../data/processed/adult_kaggle.csv",
 }
 
 
@@ -108,12 +108,18 @@ def add_engineered_features(df):
 
     score_cols = [f"A{i}_Score" for i in range(1, 11) if f"A{i}_Score" in df.columns]
     if score_cols:
+        # Final scores are assumed to be numeric 0/1 or similar
         df["score_sum"] = df[score_cols].sum(axis=1)
         df["score_mean"] = df[score_cols].mean(axis=1)
 
     for col in ("austim", "jundice"):
         if col not in df.columns:
             df[col] = 0
+        else:
+            # Map binary strings if not already numeric
+            if df[col].dtype == object:
+                binary_map = {'yes': 1, 'no': 0, 'Yes': 1, 'No': 0, 'y': 1, 'n': 0}
+                df[col] = df[col].str.lower().map(binary_map).fillna(0)
 
     df["family_risk"] = df["austim"].astype(float) + df["jundice"].astype(float)
 
@@ -165,11 +171,14 @@ def tune_xgb(X, y, n_trials=OPTUNA_TRIALS):
             "gamma": trial.suggest_float("gamma", 0.0, 5.0),
             "random_state": RANDOM_STATE,
             "use_label_encoder": False,
-            "n_jobs": -1,
+            "n_jobs": 1,
         }
-        model = XGBClassifier(eval_metric="logloss", **params)
+        y_vals = y.values.astype(int) if hasattr(y, 'values') else y.astype(int)
+        with open("y_debug.txt", "a") as f:
+            f.write(f"dataset: {X.shape}, y unique: {np.unique(y_vals)}, y len: {len(y_vals)}\n")
+        model = XGBClassifier(objective='binary:logistic', eval_metric="logloss", **params)
         cv = StratifiedKFold(n_splits=N_FOLDS, shuffle=True, random_state=RANDOM_STATE)
-        scores = cross_val_score(model, X, y, cv=cv, scoring="f1", n_jobs=-1)
+        scores = cross_val_score(model, X, y_vals, cv=cv, scoring="f1", n_jobs=1)
         return float(scores.mean())
 
     study = optuna.create_study(
@@ -202,16 +211,16 @@ def cross_validate_stack(X, y, rf_params, xgb_params, dataset_name):
         rf = RandomForestClassifier(
             **rf_params,
             random_state=RANDOM_STATE,
-            n_jobs=-1
+            n_jobs=1
         )
         xgb = XGBClassifier(
             **xgb_params,
             eval_metric="logloss",
             use_label_encoder=False,
             random_state=RANDOM_STATE,
-            n_jobs=-1
+            n_jobs=1
         )
-        lgb = LGBMClassifier(random_state=RANDOM_STATE, n_jobs=-1,verbose=-1)
+        lgb = LGBMClassifier(random_state=RANDOM_STATE, n_jobs=1,verbose=-1)
         cat = CatBoostClassifier(verbose=0, random_state=RANDOM_STATE)
 
         stack = StackingClassifier(
@@ -223,7 +232,7 @@ def cross_validate_stack(X, y, rf_params, xgb_params, dataset_name):
             ],
             final_estimator=LogisticRegression(max_iter=1000),
             stack_method="predict_proba",
-            n_jobs=-1,
+            n_jobs=1,
         )
 
         stack.fit(X_tr, y_tr)
@@ -280,6 +289,11 @@ def train_for_dataset(dataset_name, csv_path):
     # Separate X, y
     X_raw = df.drop(columns=[TARGET])
     y = df[TARGET]
+    print(f"DEBUG: {dataset_name.upper()} | y unique: {y.unique()}, dtype: {y.dtype}")
+
+    if len(y.unique()) < 2:
+        print(f"⚠️ Skipping {dataset_name.upper()}: Only one class present in labels.")
+        return None
 
     # Preprocess
     preprocessor, numeric_cols, cat_cols = build_preprocessor(X_raw)
@@ -323,7 +337,7 @@ def train_for_dataset(dataset_name, csv_path):
         "use_label_encoder": False,
         "eval_metric": "logloss",
         "random_state": RANDOM_STATE,
-        "n_jobs": -1
+        "n_jobs": 1
     })
 
     rf = RandomForestClassifier(
@@ -331,10 +345,10 @@ def train_for_dataset(dataset_name, csv_path):
         max_depth=rf_params["max_depth"],
         class_weight=rf_params["class_weight"],
         random_state=RANDOM_STATE,
-        n_jobs=-1
+        n_jobs=1
     )
-    xgb = XGBClassifier(**best_xgb_params)
-    lgb = LGBMClassifier(random_state=RANDOM_STATE, n_jobs=-1)
+    xgb = XGBClassifier(objective='binary:logistic', **best_xgb_params)
+    lgb = LGBMClassifier(random_state=RANDOM_STATE, n_jobs=1, verbose=-1)
     cat = CatBoostClassifier(verbose=0, random_state=RANDOM_STATE)
 
     print("🧠 Building stacking ensemble for final model...")
@@ -347,7 +361,7 @@ def train_for_dataset(dataset_name, csv_path):
         ],
         final_estimator=LogisticRegression(max_iter=1000),
         stack_method="predict_proba",
-        n_jobs=-1,
+        n_jobs=1,
     )
     stack.fit(X_train, y_train)
 
@@ -415,12 +429,13 @@ def train_for_dataset(dataset_name, csv_path):
     except Exception as e:
         print("⚠️ Plotting failed:", e)
 
-    # -------------------- Permutation Importance --------------------
+    # -------------------- Permutation Importance (DISABLED) --------------------
+    """
     try:
         print("🔁 Calculating permutation importance (may take time)...")
         perm = permutation_importance(
             calibrated, X_test, y_test,
-            n_repeats=10, random_state=RANDOM_STATE, n_jobs=-1
+            n_repeats=10, random_state=RANDOM_STATE, n_jobs=1
         )
         perm_df = pd.DataFrame({
             "feature": X_test.columns,
@@ -432,8 +447,10 @@ def train_for_dataset(dataset_name, csv_path):
         print("✅ Permutation importance saved:", perm_path)
     except Exception as e:
         print("⚠️ Permutation importance failed:", e)
+    """
 
-    # -------------------- SHAP Explainability --------------------
+    # -------------------- SHAP Explainability (DISABLED) --------------------
+    """
     print("🧩 Generating SHAP explainability plots...")
     try:
         X_sample = shap.utils.sample(X_test, min(100, len(X_test)), random_state=RANDOM_STATE)
@@ -477,6 +494,7 @@ def train_for_dataset(dataset_name, csv_path):
         print(f"✅ SHAP plots saved → {shap_summary_path}, {shap_bar_path}")
     except Exception as e:
         print(f"⚠️ SHAP explainability skipped due to error: {e}")
+    """
 
     print(f"🎉 Finished training for {dataset_name.upper()}.\n")
 

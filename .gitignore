@@ -3,6 +3,7 @@
 .vscode/
 .idea/
 Thumbs.db
+.env
 
 # 🐍 Python Specific Files
 # Virtual Environment
