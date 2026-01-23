@@ -1,8 +1,59 @@
 import React, { useState, useRef } from "react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
 import "./Screening.css";
+
+const EDUCATIONAL_CONTENT = [
+  {
+    title: "Understanding ASD (Autism Spectrum Disorder)",
+    body: "Autism Spectrum Disorder (ASD) is a developmental condition that affects how a person perceives and socializes with others, causing problems in social interaction and communication. The disorder also includes limited and repetitive patterns of behavior. The term 'spectrum' in ASD refers to the wide range of symptoms and severity."
+  },
+  {
+    title: "The ISAA Scoring Tool",
+    body: "The Indian Scale for Assessment of Autism (ISAA) is a clinical tool developed specifically for the Indian context. It evaluates a person across six key areas of daily life. This report uses an approximated version of the ISAA logic to help parents understand their child's unique developmental profile."
+  },
+  {
+    title: "Domain Breakdown: Social Relationship",
+    body: "This domain looks at the child's ability to bond and interact. Challenges here may manifest as difficulty in making eye contact, a preference for playing alone, and trouble understanding social rules like taking turns."
+  },
+  {
+    title: "Domain Breakdown: Emotional Responsiveness",
+    body: "Emotional responsiveness refers to how a child reacts to their own feelings and the feelings of others. A higher score here might suggest that the child finds it difficult to show empathy or has reactions that seem detached from the situation."
+  },
+  {
+    title: "Domain Breakdown: Speech-Language (Communication)",
+    body: "Communication is more than just words. This domain covers verbal speech, tone of voice, and non-verbal gestures. Children on the spectrum may repeat words (echolalia), speak in a flat tone, or use gestures like waving differently."
+  },
+  {
+    title: "Domain Breakdown: Behavior Patterns",
+    body: "This area focuses on repetitive actions and the need for consistency. This might include 'stimming' (like hand flapping), an intense focus on specific objects (like toy wheels), or severe distress when a routine is slightly changed."
+  },
+  {
+    title: "Domain Breakdown: Sensory Aspects",
+    body: "Many individuals with autism experience the world differently. They may be hypersensitive (over-reactive) or hyposensitive (under-reactive) to sounds, lights, smells, or physical touch."
+  },
+  {
+    title: "Domain Breakdown: Cognitive Component",
+    body: "Cognitive aspects include attention, memory, and visual inspection. A high score here might indicate that the child looks at things from unusual angles or has an inconsistent focus on tasks."
+  }
+];
+
+const GLOSSARY = [
+  { term: "Echolalia", definition: "A communication pattern where the child repeats exactly what they have just heard, often from adults or TV." },
+  { term: "Stimming", definition: "Self-stimulatory behaviors (like hand-flapping or rocking) used to regulate sensory input or express excitement/anxiety." },
+  { term: "Social Reciprocity", definition: "The natural back-and-forth flow of social interaction and conversation." },
+  { term: "Joint Attention", definition: "The ability to share a common focus on something (like a toy or a bird) with another person." },
+  { term: "Neurodiversity", definition: "The concept that neurological differences (like autism) are a natural and valuable part of human variation." }
+];
+
+const MILESTONES = [
+  { age: "18 Months", behavior: "Points to interest, shows toys to parents, simple pretend play (feeding dolls)." },
+  { age: "24 Months", behavior: "Notices when others are hurt/upset, looks at your face to see how to react to something new." },
+  { age: "3 Years", behavior: "Joins in play with other children, follows 2-3 step instructions, shows wide range of emotions." },
+  { age: "4-5 Years", behavior: "Plays cooperatively, tells simple stories, can distinguish between real and make-believe." }
+];
 
 const TRANSLATIONS = {
   en: {
@@ -365,6 +416,7 @@ export default function Screening() {
   const [result, setResult] = useState(null);
   const [animatedScore, setAnimatedScore] = useState(0); 
   const [error, setError] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const resultRef = useRef(null);
 
   const t = TRANSLATIONS[lang];
@@ -458,16 +510,329 @@ export default function Screening() {
   }, [result]);
 
   const downloadPDF = async () => {
-    const canvas = await html2canvas(resultRef.current);
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const ratio = canvas.width / canvas.height;
-    const imgHeight = (pageWidth - 20) / ratio;
-    pdf.text("Autism Screening Analysis - Clinical Report", 10, 10);
-    pdf.addImage(imgData, "PNG", 10, 20, pageWidth - 20, imgHeight);
-    pdf.save(`Autism_Report_${form.age}Y.pdf`);
+    setPdfLoading(true);
+    const doc = new jsPDF("p", "mm", "a4");
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const scoreData = getDomainData();
+
+    try {
+      // 0. Capture Radar Chart
+      const chartElement = document.querySelector(".chart-container");
+      let chartImg = null;
+      if (chartElement) {
+        const canvas = await html2canvas(chartElement, { scale: 2 });
+        chartImg = canvas.toDataURL("image/png");
+      }
+
+      // 1. Fetch AI Summary
+      const summaryResponse = await fetch("http://127.0.0.1:5000/generate_report_summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scores: scoreData,
+          risk_level: result.risk_level,
+          total_score: result.total_score,
+          age: form.age
+        }),
+      });
+      const summaryData = await summaryResponse.json();
+      const aiSummary = summaryData.summary || "Summary generation failed. Please consult a clinician.";
+
+      // --- PAGE 1: Clinical Results ---
+      doc.setFontSize(24);
+      doc.setTextColor(30, 64, 175); // Dark blue
+      doc.text("Clinical Screening Report", pageWidth / 2, 25, { align: "center" });
+
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Official Assessment | Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, 32, { align: "center" });
+
+      // Patient Info Table
+      autoTable(doc, {
+        startY: 40,
+        head: [['Patient Category', 'Assessment Detail']],
+        body: [
+          ['Patient Age', `${form.age} Years`],
+          ['Gender', form.gender === "Male" ? "Male" : "Female"],
+          ['Clinical Scale', 'Indian Scale for Assessment of Autism (ISAA)'],
+          ['Family History', form.autism_in_family === "1" ? "Detected" : "Not Noted"],
+          ['Birth History', form.jaundice === "1" ? "History of Jaundice" : "Normal"]
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [30, 64, 175] },
+        styles: { fontSize: 10 }
+      });
+
+      // Status Badge Area
+      const finalY_info = doc.lastAutoTable.finalY + 10;
+      const badgeColor = result.risk_level === "High" ? [239, 68, 68] : (result.risk_level === "Moderate" ? [245, 158, 11] : [34, 197, 94]);
+      doc.setFillColor(...badgeColor);
+      doc.roundedRect(14, finalY_info, pageWidth - 28, 20, 2, 2, 'F');
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`Result: ${result.risk_level} Risk Level`, pageWidth / 2, finalY_info + 12, { align: "center" });
+      
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0);
+      doc.setFontSize(11);
+      doc.text(`ISAA Cumulative Score: ${result.total_score}`, pageWidth / 2, finalY_info + 28, { align: "center" });
+
+      // Visual Score Gauge
+      const gaugeWidth = 100;
+      const gaugeX = (pageWidth - gaugeWidth) / 2;
+      const gaugeY = finalY_info + 33;
+      doc.setDrawColor(200);
+      doc.rect(gaugeX, gaugeY, gaugeWidth, 4);
+      // Fill pointer
+      const pointerPos = (result.total_score / 200) * gaugeWidth; 
+      doc.setFillColor(30, 64, 175);
+      doc.rect(gaugeX, gaugeY, Math.min(pointerPos, gaugeWidth), 4, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text("Mild", gaugeX, gaugeY + 8);
+      doc.text("Moderate", gaugeX + (gaugeWidth/2), gaugeY + 8, { align: "center" });
+      doc.text("Severe", gaugeX + gaugeWidth, gaugeY + 8, { align: "right" });
+
+      // Domain Table
+      autoTable(doc, {
+        startY: gaugeY + 15,
+        head: [['Clinical Domain', 'Score', 'Support Tier']],
+        body: scoreData.map(d => [
+          d.domain, 
+          d.score.toFixed(1),
+          d.score > 70 ? "High Support" : (d.score > 40 ? "Moderate Support" : "Monitor")
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+        styles: { fontSize: 8 }
+      });
+
+      // --- PAGE 2: AI Analysis & Personalized Interpretation ---
+      doc.addPage();
+      doc.setFontSize(20);
+      doc.setTextColor(30, 64, 175);
+      doc.text("Personalized Clinical Interpretation", 14, 25);
+      
+      doc.setDrawColor(30, 64, 175);
+      doc.setLineWidth(0.5);
+      doc.line(14, 28, pageWidth - 14, 28);
+
+      doc.setFontSize(11);
+      doc.setTextColor(31, 41, 55); 
+      doc.setFont("helvetica", "normal");
+      const splitSummary = doc.splitTextToSize(aiSummary, pageWidth - 28);
+      doc.text(splitSummary, 14, 40, { lineHeightFactor: 1.4 });
+
+      // Sensory & Behavioral Profile Visual
+      let currentY_P2 = 40 + (splitSummary.length * 6) + 12;
+      
+      // Get highest challenge area
+      const sortedDomains = [...scoreData].sort((a, b) => b.score - a.score);
+      const topChallenge = sortedDomains[0];
+
+      if (currentY_P2 < pageHeight - 120) {
+        doc.setFillColor(243, 244, 246);
+        doc.rect(10, currentY_P2, pageWidth - 20, 60, 'F');
+        doc.setFontSize(14);
+        doc.setTextColor(30, 64, 175);
+        doc.text("Clinical Functional Profile", 14, currentY_P2 + 10);
+        
+        doc.setFontSize(9);
+        doc.setTextColor(50);
+        
+        const behaviors = [
+          { d: "Social Participation", s: scoreData.find(d => d.domain.includes("Social") || d.domain.includes("Communication"))?.score || 50 },
+          { d: "Adaptive Behavior", s: scoreData.find(d => d.domain.includes("Behavior") || d.domain.includes("Cognitive"))?.score || 50 },
+          { d: "Sensory Awareness", s: scoreData.find(d => d.domain.includes("Sensory") || d.domain.includes("Motor"))?.score || 50 }
+        ];
+        
+        behaviors.forEach((b, i) => {
+          doc.setFont("helvetica", "bold");
+          doc.text(`${b.d}:`, 14, currentY_P2 + 20 + (i * 12));
+          doc.setFont("helvetica", "normal");
+          const impact = b.s > 70 ? "High Support" : (b.s > 40 ? "Moderate Support" : "Monitor");
+          doc.text(`Level: ${impact}`, 14, currentY_P2 + 25 + (i * 12));
+          
+          // Progress bar visual
+          doc.setDrawColor(200);
+          doc.rect( pageWidth - 64, currentY_P2 + 22 + (i * 12), 50, 3);
+          doc.setFillColor(30, 64, 175);
+          const fillWidth = (b.s / 100) * 50;
+          doc.rect( pageWidth - 64, currentY_P2 + 22 + (i * 12), Math.min(fillWidth, 50), 3, 'F');
+        });
+        currentY_P2 += 65;
+      }
+
+      // Dynamic Home Strategies Box
+      if (currentY_P2 + 75 > pageHeight) { doc.addPage(); currentY_P2 = 25; }
+      doc.setFillColor(239, 246, 255);
+      doc.rect(10, currentY_P2, pageWidth - 20, 75, 'F');
+      doc.setFontSize(15);
+      doc.setTextColor(30, 64, 175);
+      doc.text(`Immediate Strategies for ${topChallenge.domain}`, 14, currentY_P2 + 12);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(55, 65, 81);
+      
+      let tailoredStrategies = [
+        "1. Focus on early detection signs during daily routines.",
+        "2. Maintain a consistent daily schedule to reduce anxiety.",
+        "3. Use simplified language and visual cues for communication.",
+        "4. Engage in structured mirroring of your child's positive actions.",
+        "5. Document sensory triggers to discuss with your specialist."
+      ];
+
+      if (topChallenge.domain.includes("Social") || topChallenge.domain.includes("Communication")) {
+        tailoredStrategies = [
+          "1. Use Visual Schedules: Picture cards help bridge communication gaps.",
+          "2. Joint Attention Play: Follow your child's lead for 15 mins daily.",
+          "3. Social Mirroring: Copy their sounds/actions to build connection.",
+          "4. Praise Engagement: Reward even brief moments of eye contact.",
+          "5. Turn-Taking Games: Simple rolling ball or block-sharing games."
+        ];
+      } else if (topChallenge.domain.includes("Behavior") || topChallenge.domain.includes("Sensory")) {
+        tailoredStrategies = [
+          "1. Sensory Breaks: Create a 'Quiet Zone' with soft lighting and noise control.",
+          "2. Transition Warnings: Use timers or '1-minute remaining' cues for changes.",
+          "3. Weighted Blankets/Vests: If advised, for calming during high stimulation.",
+          "4. Alternative Communication: Use 'PECS' or sign language for requests.",
+          "5. Safe Sensory Exploration: Provide controlled textures/sounds for play."
+        ];
+      }
+
+      tailoredStrategies.forEach((s, i) => {
+        doc.text(s, 16, currentY_P2 + 22 + (i * 9));
+      });
+
+      // --- PAGE 3: Roadmap & Professional Journal ---
+      doc.addPage();
+      doc.setFontSize(22);
+      doc.setTextColor(30, 64, 175);
+      doc.text("Clinical Action Plan & Roadmap", 14, 25);
+
+      // Roadmap Steps Table (High Density)
+      autoTable(doc, {
+        startY: 35,
+        head: [['Clinical Phase', 'Action Step', 'Clinical Objective']],
+        body: [
+          ['Detection', 'Pediatric Consultation', 'Review ISAA score with a specialist.'],
+          ['Diagnosis', 'Specialist Evaluation', 'Full clinical workup (ADOS-2/CARS).'],
+          ['Planning', 'Therapy Assessment', 'Define Speech, OT, and Physio needs.'],
+          ['Support', 'Educational Liaison', 'School support and classroom adjustments.'],
+          ['Monitoring', '6-Month Re-evaluation', 'Track intervention effectiveness.']
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [30, 64, 175] },
+        styles: { fontSize: 8.5 }
+      });
+
+      // Clinical Documentation Guidance
+      const guidanceY = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(14);
+      doc.setTextColor(30, 64, 175);
+      doc.text("Clinical Documentation & Guidance", 14, guidanceY);
+      doc.setFontSize(9.5);
+      doc.setTextColor(60);
+      const guidanceText = "The roadmap above outlines the standard diagnostic progression from initial detection to structured intervention. To contextualize these steps, the table below provides a reference of typical developmental milestones. It is recommended to share this report with a specialist to discuss these data points in detail during your child's clinical evaluation.";
+      const splitGuidance = doc.splitTextToSize(guidanceText, pageWidth - 28);
+      doc.text(splitGuidance, 14, guidanceY + 8, { lineHeightFactor: 1.4 });
+
+      // Typical Developmental Milestones
+      autoTable(doc, {
+        startY: guidanceY + 28,
+        head: [['Age Range', 'Expected Social/Communication Milestones']],
+        body: MILESTONES.map(m => [m.age, m.behavior]),
+        theme: 'grid',
+        headStyles: { fillColor: [71, 85, 105] },
+        styles: { fontSize: 8.5 }
+      });
+
+      // Notes for Pediatrician/Consultant
+      const notesY = doc.lastAutoTable.finalY + 15;
+      if (notesY + 40 < pageHeight) {
+        doc.setDrawColor(210);
+        doc.rect(14, notesY, pageWidth - 28, 35);
+        doc.setFontSize(10);
+        doc.setTextColor(30, 64, 175);
+        doc.text("Clinician's Observation Notes (to be filled by examiner)", 18, notesY + 8);
+        doc.setDrawColor(230);
+        for(let i=0; i<3; i++) {
+          doc.line(18, notesY + 16 + (i * 8), pageWidth - 18, notesY + 16 + (i * 8));
+        }
+      }
+
+      // --- PAGE 4: In-Depth Analysis & FAQ ---
+      doc.addPage();
+      doc.setFontSize(22);
+      doc.setTextColor(30, 64, 175);
+      doc.text("In-Depth Clinical Guidance", 14, 25);
+      
+      let currentY = 40;
+      EDUCATIONAL_CONTENT.slice(0, 3).forEach(item => {
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 64, 175);
+        doc.text(item.title, 14, currentY);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(75, 85, 99);
+        const body = doc.splitTextToSize(item.body, pageWidth - 28);
+        doc.text(body, 14, currentY + 8, { lineHeightFactor: 1.3 });
+        currentY += (body.length * 6) + 15;
+      });
+
+      // Research & Clinical Indices (Density)
+      const researchY = pageHeight - 110;
+      doc.setFontSize(10);
+      doc.setTextColor(30, 64, 175);
+      doc.text("Clinical Indices & Research References", 14, researchY);
+      doc.setFontSize(7.5);
+      doc.setTextColor(100);
+      const refs = [
+        "• ISAA: Patra S, et al. (2015) - Psychometric properties of Indian Scale for Assessment of Autism.",
+        "• Early Detection: Zwaigenbaum L, et al. (2015) - Early Identification of Autism Spectrum Disorder.",
+        "• Intervention: National Research Council (2001) - Educating Children with Autism (NAP)."
+      ];
+      refs.forEach((r, i) => doc.text(r, 14, researchY + 6 + (i * 5)));
+
+      // Resources
+      const resY = pageHeight - 85;
+      doc.setFontSize(14);
+      doc.setTextColor(30, 64, 175);
+      doc.text("Priority Karnataka Resources", 14, resY);
+      doc.setFontSize(9);
+      doc.setTextColor(55, 65, 81);
+      doc.text("• NIMHANS: 080-26995000 | • AIISH: 0821-2502100 | • CADABAMS: 96111-94949", 14, resY + 8);
+      doc.text("Visit these centers for formally certified ISAA/CARS assessments.", 14, resY + 14);
+
+      // Disclaimer
+      doc.setFillColor(254, 242, 242);
+      doc.rect(10, pageHeight - 45, pageWidth - 20, 25, 'F');
+      doc.setFontSize(9);
+      doc.setTextColor(185, 28, 28);
+      doc.setFont("helvetica", "bold");
+      doc.text("CRITICAL CLINICAL DISCLOSURE:", 14, pageHeight - 37);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(153, 27, 27);
+      const disclaimerText = "This automated report is NOT a clinical diagnosis. It is a screening tool designed to facilitate early detection. Only a multidisciplinary team of specialists can provide a formal medical diagnosis of ASD. Please share this report with your pediatrician.";
+      doc.text(doc.splitTextToSize(disclaimerText, pageWidth - 28), 14, pageHeight - 32);
+
+      doc.save(`Professional_Clinical_Report_${form.age}Y.pdf`);
+
+    } catch (err) {
+      console.error("Advanced PDF generation failed:", err);
+      // Fallback
+      const canvas = await html2canvas(resultRef.current);
+      const pdf = new jsPDF();
+      pdf.text("Autism Screening Analysis - Preliminary Snapshot", 10, 10);
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 10, 20, 190, 0);
+      pdf.save("ASD_Screening_Snapshot.pdf");
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   const getDomainData = () => {
@@ -649,7 +1014,9 @@ export default function Screening() {
 
           <div className="actions-bar">
             <button className="reset-btn" onClick={() => window.location.reload()}>{t.startOver}</button>
-            <button className="pdf-btn" onClick={downloadPDF}>{t.downloadPDF}</button>
+            <button className="pdf-btn" onClick={downloadPDF} disabled={pdfLoading}>
+              {pdfLoading ? "Generating Clinical Report..." : t.downloadPDF}
+            </button>
           </div>
         </div>
       </div>

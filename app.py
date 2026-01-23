@@ -6,35 +6,49 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import google.generativeai as genai
 import traceback
+from dotenv import load_dotenv
+
+load_dotenv() # Load variables from .env file
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
 # --- Configuration ---
-MODEL_PATH = os.path.join("autism_ml", "artifacts", "child_model_20251204_1503.pkl")
+MODELS_CONFIG = {
+    "child": os.path.join("autism_ml", "artifacts", "child_model_20260123_1748.pkl"),
+    "adolescent": os.path.join("autism_ml", "artifacts", "adolescent_model_20260123_1750.pkl"),
+    "adult": os.path.join("autism_ml", "artifacts", "adult_model_20260123_1754.pkl"),
+}
 
 # Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyDIOo4mfGFzj_08z9dVlrwgXgC44TBSWBc") # Placeholder
-genai.configure(api_key=GEMINI_API_KEY)
+# IMPORTANT: Provide your Gemini API Key in a .env file as: GEMINI_API_KEY=your_key_here
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
+if not GEMINI_API_KEY or "YOUR_NEW" in GEMINI_API_KEY:
+    print("⚠️  WARNING: GEMINI_API_KEY not found in environment. Chat features will fail.")
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
 
-# Chatbot System Prompt
+# Professional Clinical Support System Prompt
 SYSTEM_PROMPT = """
-You are a helpful assistant for an Autism Screening app. Keep responses SHORT and CONCISE (2-3 sentences max).
+You are a highly qualified Clinical Psychology Assistant specializing in Autism Spectrum Disorder (ASD). 
+Your goal is to provide empathetic, evidence-based, and professional explanations to parents and clinicians.
 
-Key points:
-- This app uses ISAA (Indian Scale for Assessment of Autism) with 40 questions across 6 domains
-- Domains: Social Relationship, Emotional Responsiveness, Speech-Language, Behavior Patterns, Sensory Aspects, Cognitive
-- Karnataka resources: ASHA, Com DEALL, AIISH (Bangalore, Mysuru, Hubli, Mangaluru)
-- Always remind users: This is a screening tool, NOT a diagnosis. Consult a specialist for evaluation.
-
-Be empathetic. Avoid long explanations unless specifically asked.
+Key Guidelines:
+1. Speak professionally but avoid overly complex medical jargon unless explaining it.
+2. Focus on the ISAA (Indian Scale for Assessment of Autism) domains: Social Relationship, Emotional Responsiveness, Speech-Language, Behavior Patterns, Sensory Aspects, and Cognitive component.
+3. If providing a case summary, interpret scores carefully: High scores in a domain indicate more significant challenges.
+4. Always include a disclaimer that this is a screening tool and not a final clinical diagnosis.
+5. Provide actionable next steps like visiting a Developmental Pediatrician or Early Intervention centers in Karnataka (like NIMHANS, AIISH, or Com DEALL).
+6. Keep responses helpful but concise.
 """
+
 generation_config = {
-  "temperature": 0.7,
+  "temperature": 0.5,
   "top_p": 0.95,
   "top_k": 40,
-  "max_output_tokens": 256,
+  "max_output_tokens": 512,
 }
+
 chat_model = genai.GenerativeModel(
     model_name="gemini-2.5-flash",
     generation_config=generation_config,
@@ -42,14 +56,28 @@ chat_model = genai.GenerativeModel(
 )
 chat_session = chat_model.start_chat(history=[])
 
-# --- Load Model & Preprocessor ---
-if not os.path.exists(MODEL_PATH):
-    print(f"❌ Model file not found: {MODEL_PATH}")
-    model_data = None
-else:
-    print(f"📥 Loading model: {MODEL_PATH}")
-    model_data = joblib.load(MODEL_PATH)
-    print("✅ Model loaded successfully.")
+# --- Load Models & Preprocessors ---
+models_data = {}
+for category, path in MODELS_CONFIG.items():
+    if not os.path.exists(path):
+        print(f"❌ Model file not found for {category}: {path}")
+    else:
+        print(f"📥 Loading {category} model: {path}")
+        models_data[category] = joblib.load(path)
+        print(f"✅ {category.upper()} model loaded successfully.")
+
+def get_model_category(age):
+    """Categorizes age into child, adolescent, or adult."""
+    try:
+        age_val = float(age)
+        if age_val <= 11:
+            return "child"
+        elif age_val <= 16:
+            return "adolescent"
+        else:
+            return "adult"
+    except:
+        return "child" # Default to child if error
 
 def add_engineered_features(df):
     """Adds engineered features expected by the model."""
@@ -121,13 +149,18 @@ def calculate_isaa_risk(data):
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    if model_data is None:
-        return jsonify({"error": "Model not loaded"}), 500
-
     try:
         data = request.json
         if not data:
             return jsonify({"error": "No data provided"}), 400
+            
+        # Determine age category
+        age = data.get("age", 5)
+        category = get_model_category(age)
+        
+        model_data = models_data.get(category)
+        if model_data is None:
+            return jsonify({"error": f"Model for category '{category}' not loaded"}), 500
 
         # Create DataFrame from input
         # Map frontend field names to model field names
@@ -225,6 +258,10 @@ def evaluate_isaa():
 
         # Run ML inference
         ml_prob = 0
+        age = data.get("age", 5)
+        category = get_model_category(age)
+        model_data = models_data.get(category)
+        
         if model_data:
             try:
                 # Reuse the internal predict logic but with mapped inputs
@@ -291,8 +328,21 @@ def chat():
         if not user_message:
             return jsonify({"error": "No message provided"}), 400
 
+        # Enhanced System Prompt for Professional Clinical Guidance
+        system_prompt = (
+            "You are a Clinical ASD Support Assistant specialized in the Indian Scale for Assessment of Autism (ISAA). "
+            "Your goal is to explain screening results, clinical terms, and developmental strategies to parents. "
+            "Be empathetic, supportive, and professional. Avoid making definitive medical diagnoses; always emphasize "
+            "that the screening tool is for early detection and that a formal evaluation by a specialist (Pediatrician, "
+            "Psychologist, or Neurologist) is essential. Use clear, non-jargon language, but explain technical terms if asked. "
+            "Focus on actionable advice and emotional support for families in India."
+        )
+        
+        # Combine system prompt with user message for context
+        full_query = f"{system_prompt}\n\nUser Question: {user_message}"
+        
         # Send message to Gemini
-        response = chat_session.send_message(user_message)
+        response = chat_session.send_message(full_query)
         bot_reply = response.text
         
         return jsonify({"response": bot_reply})
@@ -302,6 +352,61 @@ def chat():
         print(f"❌ Chat Error: {e}")
         print(f"Full traceback:\n{error_details}")
         return jsonify({"response": f"Error: {str(e)}"}), 500
+
+@app.route("/generate_report_summary", methods=["POST"])
+def generate_report_summary():
+    """
+    Generates a personalized 2-3 paragraph clinical summary based on domain scores.
+    """
+    try:
+        data = request.json
+        print(f"DEBUG: Generating report for risk={data.get('risk_level')}, score={data.get('total_score')}")
+        
+        scores = data.get("scores", [])
+        risk_level = data.get("risk_level", "Unknown")
+        total_score = data.get("total_score", 0)
+        age = data.get("age", "Unknown")
+        
+        if not scores:
+            return jsonify({"error": "No scores provided"}), 400
+            
+        # Format the context for Gemini
+        context = f"The patient (Age: {age}) has been screened using the ISAA tool. "
+        context += f"Overall Risk Level: {risk_level} (Total Score: {total_score}).\n"
+        context += "Domain-wise scores (normalized 0-100, where higher means more challenges):\n"
+        for s in scores:
+            context += f"- {s['domain']}: {s['score']}/100\n"
+            
+        prompt = f"""
+        Based on the following screening data, provide a comprehensive, 350-500 word clinical interpretation for a parent's report.
+        
+        Data:
+        {context}
+        
+        Mandatory Structure:
+        1. Comprehensive Overview (2 paragraphs): Explain the {risk_level} risk level using the ISAA (Indian Scale for Assessment of Autism) context. Discuss how the cumulative score of {total_score} reflects their current developmental profile.
+        2. Daily Life Challenges (2-3 paragraphs): Specifically address domains with scores above 40. Use the phrase 'Based on this analysis, your child might face problems like...' and provide 5-8 concrete, practical examples of challenges at home, in the park, or at social gatherings.
+        3. Educational and Social Guidance (1-2 paragraphs): Explain how these challenges might manifest in a classroom setting (e.g., following group instructions or peer play).
+        4. Clear Path Forward (1 paragraph): Emphasize that screening is the first step toward understanding, not a label, and stress the urgency of a specialist evaluation.
+        
+        Rules:
+        - Be empathetic, expert, and highly descriptive.
+        - Write in plain text paragraphs only.
+        - DO NOT use markdown headers (#), bullets (-), or bold text (**).
+        - Use simple, professional language suitable for a clinical report.
+        """
+        
+        print(f"DEBUG: Sending prompt to Gemini...")
+        response = chat_model.generate_content(prompt)
+        summary = response.text
+        print(f"DEBUG: Gemini response received ({len(summary)} chars)")
+        
+        return jsonify({"summary": summary})
+        
+    except Exception as e:
+        print(f"❌ Report Summary Error: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
