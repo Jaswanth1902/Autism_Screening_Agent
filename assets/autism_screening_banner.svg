@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%">
+  <defs>
+    <radialGradient id="vignette-aut" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#141724" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#0B0D15" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#06070B" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="gold-aut" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E5C77A"/>
+      <stop offset="50%" stop-color="#C5A059"/>
+      <stop offset="100%" stop-color="#9B7732"/>
+    </linearGradient>
+    <style>
+      .serif-title { font-family: 'Cinzel', 'Cormorant Garamond', 'Didot', 'Playfair Display', 'Baskerville', 'Georgia', serif; font-weight: 400; }
+      .serif-sub { font-family: 'Cormorant Garamond', 'Baskerville', 'Georgia', serif; font-style: italic; }
+      .mono-tech { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="420" fill="#06070B"/>
+  <rect width="1200" height="420" fill="url(#vignette-aut)"/>
+
+  <!-- Frame -->
+  <rect x="24" y="24" width="1152" height="372" fill="none" stroke="#C5A059" stroke-width="0.75" stroke-opacity="0.35"/>
+  <rect x="28" y="28" width="1144" height="364" fill="none" stroke="#C5A059" stroke-width="0.5" stroke-dasharray="4,6" stroke-opacity="0.2"/>
+
+  <!-- Corner Rosettes -->
+  <g stroke="#C5A059" stroke-width="0.8" opacity="0.6">
+    <path d="M20 24 h16 M24 20 v16"/>
+    <path d="M1180 24 h-16 M1176 20 v16"/>
+    <path d="M20 396 h16 M24 392 v16"/>
+    <path d="M1180 396 h-16 M1176 392 v16"/>
+    <circle cx="24" cy="24" r="3" fill="none"/>
+    <circle cx="1176" cy="24" r="3" fill="none"/>
+    <circle cx="24" cy="396" r="3" fill="none"/>
+    <circle cx="1176" cy="396" r="3" fill="none"/>
+  </g>
+
+  <!-- Psychometric Continuum & Neural Constellation (Left Visual) -->
+  <g transform="translate(225, 210)" stroke="#C5A059" fill="none">
+    <!-- Concentric Radar Webs -->
+    <g stroke-width="0.4" stroke-opacity="0.15" stroke-dasharray="2,4">
+      <polygon points="0,-140 133,-43 82,113 -82,113 -133,-43"/>
+      <polygon points="0,-100 95,-31 59,81 -59,81 -95,-31"/>
+      <polygon points="0,-60 57,-19 35,49 -35,49 -57,-19"/>
+      <line x1="0" y1="0" x2="0" y2="-150"/>
+      <line x1="0" y1="0" x2="140" y2="-45"/>
+      <line x1="0" y1="0" x2="90" y2="120"/>
+      <line x1="0" y1="0" x2="-90" y2="120"/>
+      <line x1="0" y1="0" x2="-140" y2="-45"/>
+    </g>
+
+    <!-- Psychometric Score Polygon (Gold Accent) -->
+    <polygon points="0,-115 110,-35 45,60 -70,95 -105,-30" 
+             stroke="url(#gold-aut)" stroke-width="1.3" fill="#1B2236" fill-opacity="0.6"/>
+
+    <!-- Neural Nodal Anchors -->
+    <g fill="#E5C77A" stroke="none">
+      <circle cx="0" cy="-115" r="3"/>
+      <circle cx="110" cy="-35" r="3"/>
+      <circle cx="45" cy="60" r="3"/>
+      <circle cx="-70" cy="95" r="3"/>
+      <circle cx="-105" cy="-30" r="3"/>
+      <circle cx="0" cy="0" r="4" fill="#38BDF8"/>
+    </g>
+
+    <!-- Dimension Annotations -->
+    <text x="0" y="-155" fill="#C5A059" font-size="7" text-anchor="middle" class="mono-tech">SOCIAL RECIPROCITY</text>
+    <text x="145" y="-45" fill="#C5A059" font-size="7" class="mono-tech">COMMUNICATION</text>
+    <text x="95" y="132" fill="#C5A059" font-size="7" class="mono-tech">SENSORY</text>
+    <text x="-95" y="132" fill="#C5A059" font-size="7" text-anchor="end" class="mono-tech">BEHAVIORAL</text>
+    <text x="-145" y="-45" fill="#C5A059" font-size="7" text-anchor="end" class="mono-tech">ATTENTION</text>
+
+    <text x="-165" y="-140" fill="#C5A059" opacity="0.45" font-size="9" class="mono-tech">FIG. VI — CLINICAL PSYCHOMETRICS</text>
+    <text x="-165" y="155" fill="#C5A059" opacity="0.4" font-size="8" class="mono-tech">AQ-10 • M-CHAT-R • GEMINI 3 HITL</text>
+  </g>
+
+  <!-- Typography (Center-Right) -->
+  <g transform="translate(465, 0)">
+    <text x="0" y="125" fill="#C5A059" font-size="11" letter-spacing="4" class="serif-title" opacity="0.85">
+      CLINICAL BEHAVIORAL DIAGNOSTIC &amp; SCREENING PIPELINE
+    </text>
+
+    <text x="0" y="185" fill="#FDFBF7" font-size="44" letter-spacing="8" class="serif-title">
+      AUTISM SCREENING AGENT
+    </text>
+
+    <g transform="translate(0, 210)" stroke="#C5A059" opacity="0.6">
+      <line x1="0" y1="0" x2="420" y2="0" stroke-width="0.8"/>
+      <circle cx="210" cy="0" r="3" fill="#C5A059"/>
+      <circle cx="105" cy="0" r="1.5" fill="#C5A059"/>
+      <circle cx="315" cy="0" r="1.5" fill="#C5A059"/>
+    </g>
+
+    <text x="0" y="245" fill="#C5BEB3" font-size="14" letter-spacing="2" class="serif-title" opacity="0.9">
+      PSYCHOMETRIC SCORING • MULTI-MODAL REASONING • ACCESSIBLE CARE
+    </text>
+
+    <text x="0" y="275" fill="#8C857B" font-size="13" class="serif-sub">
+      Bridging clinical questionnaires with multimodal AI to support accessible early childhood intervention.
+    </text>
+
+    <g transform="translate(0, 315)">
+      <rect x="0" y="0" width="130" height="24" rx="2" fill="#10131E" stroke="#C5A059" stroke-width="0.6" stroke-opacity="0.4"/>
+      <text x="65" y="16" fill="#C5A059" font-size="10" text-anchor="middle" class="mono-tech">AQ-10 / M-CHAT</text>
+
+      <rect x="142" y="0" width="135" height="24" rx="2" fill="#10131E" stroke="#C5A059" stroke-width="0.6" stroke-opacity="0.4"/>
+      <text x="209" y="16" fill="#C5A059" font-size="10" text-anchor="middle" class="mono-tech">GEMINI 3 MULTIMODAL</text>
+
+      <rect x="289" y="0" width="145" height="24" rx="2" fill="#10131E" stroke="#C5A059" stroke-width="0.6" stroke-opacity="0.4"/>
+      <text x="361" y="16" fill="#38BDF8" font-size="10" text-anchor="middle" class="mono-tech">CLINICAL HITL</text>
+    </g>
+
+    <text x="0" y="365" fill="#5C564E" font-size="9" letter-spacing="2" class="mono-tech">
+      EX COMPASSIONE SCIENTIA • ANNO MMXXVI • OPEN HEALTHCARE
+    </text>
+  </g>
+</svg>
